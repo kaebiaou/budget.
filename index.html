@@ -1,0 +1,781 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Budget Perso</title>
+<meta name="theme-color" content="#1f5f8b">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{
+  --bg:#f3f5f8; --card:#ffffff; --ink:#18212b; --muted:#5f6b78; --line:#dde3ea;
+  --brand:#1f5f8b; --brand-ink:#ffffff; --ok:#1d7a46; --warn:#b26b00; --bad:#b3261e;
+  --alloc:#1f5f8b; --spent:#e07b39; --rev:#6a8f3a; --soft:#e8eef5;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#12161b; --card:#1b2129; --ink:#e7ecf1; --muted:#9aa6b3; --line:#2c3540;
+    --brand:#4f9bd1; --brand-ink:#0d1216; --ok:#4cc27e; --warn:#e0a53a; --bad:#ef6b62;
+    --alloc:#4f9bd1; --spent:#f0925a; --rev:#9cc260; --soft:#232c37; }
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:5;background:var(--brand);color:var(--brand-ink);padding:10px 16px calc(10px);padding-top:calc(10px + env(safe-area-inset-top))}
+header .row{display:flex;gap:8px;align-items:center}
+header h1{font-size:17px;margin:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+header select{font-size:15px;padding:6px 8px;border-radius:8px;border:0;background:rgba(255,255,255,.92);color:#18212b;max-width:55vw}
+#syncdot{width:10px;height:10px;border-radius:50%;background:#999;flex:none}
+#syncdot.ok{background:#4cc27e}#syncdot.busy{background:#e0a53a}#syncdot.err{background:#ef6b62}
+header .period{font-size:12px;opacity:.9;margin-top:2px}
+main{padding:12px 16px 96px;max-width:900px;margin:0 auto}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);z-index:5}
+nav button{flex:1;border:0;background:none;color:var(--muted);padding:8px 2px 10px;font-size:11px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer}
+nav button svg{width:22px;height:22px}
+nav button.on{color:var(--brand);font-weight:600}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
+.card h2{font-size:15px;margin:0 0 8px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
+.kpi{background:var(--soft);border-radius:10px;padding:8px 10px}
+.kpi .l{font-size:12px;color:var(--muted)}.kpi .v{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums}
+.pos{color:var(--ok)}.neg{color:var(--bad)}.wrn{color:var(--warn)}
+.muted{color:var(--muted)}.small{font-size:12px}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:9px 12px;font-size:14px;cursor:pointer}
+.btn.pri{background:var(--brand);color:var(--brand-ink);border-color:var(--brand);font-weight:600}
+.btn.bad{color:var(--bad)}
+.btn:disabled{opacity:.5}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+label.f{display:block;font-size:12px;color:var(--muted);margin:8px 0 3px}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%}
+input.amt{text-align:right;font-variant-numeric:tabular-nums}
+.rub{display:grid;grid-template-columns:44px 1fr 120px;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
+.rub:first-child{border-top:0}
+.rub .code{font-size:12px;font-weight:700;color:var(--brand)}
+.rub .lib{font-size:14px;cursor:pointer;word-break:break-word}
+.rub .prev{font-size:11.5px;color:var(--muted)}
+.grp{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:14px 0 2px}
+.bar{height:8px;background:var(--soft);border-radius:4px;overflow:hidden;margin-top:4px}
+.bar i{display:block;height:100%;background:var(--ok)}
+.bar i.w{background:var(--warn)}.bar i.b{background:var(--bad)}
+.sold{padding:8px 0;border-top:1px solid var(--line);cursor:pointer}
+.sold:first-child{border-top:0}
+.sold .t{display:flex;justify-content:space-between;gap:8px}
+.sold .t b{font-variant-numeric:tabular-nums;white-space:nowrap}
+.dep{display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-top:1px solid var(--line);align-items:center}
+.dep:first-child{border-top:0}
+.dep>div:first-child{min-width:0;flex:1;word-break:break-word}
+.dep .x{border:0;background:none;color:var(--bad);font-size:18px;cursor:pointer;padding:0 4px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:6px 4px;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--muted);font-weight:600}
+.scroll{overflow-x:auto}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:6px}
+.legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px;background:var(--c)}
+svg text{fill:var(--muted);font-size:11px}
+.toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);background:#18212b;color:#fff;padding:9px 14px;border-radius:10px;font-size:14px;z-index:20;max-width:90vw;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.on{opacity:1}
+dialog{border:0;border-radius:14px;padding:16px;max-width:460px;width:calc(100vw - 32px);background:var(--card);color:var(--ink)}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+.sticky-tot{position:sticky;bottom:64px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:8px;box-shadow:0 2px 10px rgba(0,0,0,.08)}
+.sticky-tot .t{display:flex;justify-content:space-between}
+.hidden{display:none!important}
+.empty{text-align:center;padding:24px 8px;color:var(--muted)}
+.pill{display:inline-block;font-size:11px;padding:1px 7px;border-radius:9px;background:var(--soft);color:var(--muted)}
+</style>
+</head>
+<body>
+<header>
+  <div class="row">
+    <span id="syncdot" title="Synchronisation"></span>
+    <h1>Budget Perso</h1>
+    <select id="moisSel" aria-label="Mois"></select>
+  </div>
+  <div class="period" id="periodTxt"></div>
+</header>
+<main id="main"></main>
+<nav id="nav">
+  <button data-v="budget"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 13h3M8 16h6"/></svg>Budget</button>
+  <button data-v="depense"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>Dépense</button>
+  <button data-v="soldes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5M4 19h16M8 15l4-4 3 3 5-6"/></svg>Soldes</button>
+  <button data-v="rapports"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 20V10M12 20V4M18 20v-7"/></svg>Rapports</button>
+  <button data-v="reglages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Réglages</button>
+</nav>
+<div class="toast" id="toast"></div>
+<dialog id="dlg"></dialog>
+
+<script>
+"use strict";
+/* ==================== Constantes ==================== */
+const LS_KEY = "budgetperso.data.v1";
+const LS_CFG = "budgetperso.cfg.v1";
+const MOIS_FR = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
+const MOIS_ABR = {JAN:1,JANV:1,JANVIER:1,FEV:2,FEVR:2,FEVRIER:2,MAR:3,MARS:3,AVR:4,AVRIL:4,MAI:5,JUIN:6,JUIL:7,JUILLET:7,AOU:8,AOUT:8,SEP:9,SEPT:9,SEPTEMBRE:9,OCT:10,OCTOBRE:10,NOV:11,NOVEMBRE:11,DEC:12,DECEMBRE:12};
+const GROUPES = ["Banque & crédit","Dons & église","Enfants","Épargne","Personnel","Communication","Véhicule","Maison","Alimentation","Famille & soutien","Santé","Divers"];
+const GROUP_COLORS = ["#1f5f8b","#7b4fa0","#d0558c","#1d7a46","#e07b39","#3a9bb5","#8a6d3b","#5a7d2a","#c99a1e","#b3261e","#2f8f83","#7a8794"];
+
+/* ==================== Utilitaires ==================== */
+const $ = s => document.querySelector(s);
+const now = () => Date.now();
+const uid = () => now().toString(36) + Math.random().toString(36).slice(2, 8);
+const fmtN = n => new Intl.NumberFormat("fr-FR", {maximumFractionDigits: 0}).format(Math.round(n || 0));
+const fmt = n => fmtN(n) + " F";
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const parseAmt = s => { const v = Number(String(s ?? "").replace(/[\s  F]/g, "").replace(",", ".")); return isFinite(v) ? Math.round(v) : 0; };
+const norm = s => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase();
+const pad = n => String(n).padStart(2, "0");
+const isoDate = d => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+const today = () => isoDate(new Date());
+const fmtDate = s => { if (!s) return ""; const [y, m, d] = s.split("-"); return d + "/" + m + "/" + y; };
+const moisTitre = k => { const [y, m] = k.split("-").map(Number); return MOIS_FR[m - 1] + " " + y; };
+const moisShort = k => { const [y, m] = k.split("-").map(Number); return MOIS_FR[m - 1].slice(0, 3) + ". " + String(y).slice(2); };
+const nextKey = k => { let [y, m] = k.split("-").map(Number); m++; if (m > 12) { m = 1; y++; } return y + "-" + pad(m); };
+const prevKeyOf = k => { let [y, m] = k.split("-").map(Number); m--; if (m < 1) { m = 12; y--; } return y + "-" + pad(m); };
+const addDays = (s, n) => { const d = new Date(s + "T12:00:00"); d.setDate(d.getDate() + n); return isoDate(d); };
+const addMonths = (s, n) => { const d = new Date(s + "T12:00:00"); d.setMonth(d.getMonth() + n); return isoDate(d); };
+function toast(msg, ms = 2200) { const t = $("#toast"); t.textContent = msg; t.classList.add("on"); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove("on"), ms); }
+
+/* ==================== Données ==================== */
+// Chaque entité porte u (horodatage de modification) pour fusionner entre appareils.
+function emptyData() { return { v: 1, rubriques: {}, mois: {}, depenses: {} }; }
+let D = emptyData();
+let CFG = { clientId: "", vue: "budget", mois: "" };
+try { D = Object.assign(emptyData(), JSON.parse(localStorage.getItem(LS_KEY) || "null") || {}); } catch (e) {}
+try { CFG = Object.assign(CFG, JSON.parse(localStorage.getItem(LS_CFG) || "null") || {}); } catch (e) {}
+const saveCfg = () => { try { localStorage.setItem(LS_CFG, JSON.stringify(CFG)); } catch (e) {} };
+function save(sync = true) {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(D)); } catch (e) { toast("Stockage local indisponible"); }
+  if (sync) Sync.schedule();
+}
+
+const rubs = () => Object.values(D.rubriques).sort((a, b) => a.ordre - b.ordre || a.code.localeCompare(b.code));
+const moisKeys = () => Object.keys(D.mois).filter(k => !D.mois[k].del).sort();
+const M = () => D.mois[CFG.mois];
+function moisRubs(k) {
+  const m = D.mois[k]; if (!m) return [];
+  return rubs().filter(r => m.alloc[r.id] && !m.alloc[r.id].del);
+}
+const alloue = (k, rid) => { const a = D.mois[k]?.alloc[rid]; return a && !a.del ? (a.m || 0) : 0; };
+const depsMois = k => Object.values(D.depenses).filter(d => !d.del && d.mois === k);
+function depenseParRub(k) { const o = {}; for (const d of depsMois(k)) o[d.rub] = (o[d.rub] || 0) + d.montant; return o; }
+const revenus = k => { const m = D.mois[k]; if (!m) return 0; return (m.revenus || []).filter(r => !r.del).reduce((s, r) => s + (r.m || 0), 0); };
+function totaux(k) {
+  const rs = moisRubs(k), dp = depenseParRub(k);
+  let A = 0, S = 0; for (const r of rs) { A += alloue(k, r.id); } for (const v of Object.values(dp)) S += v;
+  const R = revenus(k);
+  return { revenus: R, alloue: A, depense: S, reste: A - S, nonAlloue: R - A, soldeReel: R - S };
+}
+function devinerGroupe(lib) {
+  const s = norm(lib);
+  const T = [
+    [/MAMAN|ROSELYNE|IMPREVU|SOUTIEN/, "Famille & soutien"],
+    [/PRET|FRAIS DE TENUE|INTERET|OVP|CREDIT BANC/, "Banque & crédit"],
+    [/DIME|OFFRANDE|\bDON\b/, "Dons & église"],
+    [/ABIGA|FIDELIA|CANTINE|ENFANT|ECOLE|SCOLAR/, "Enfants"],
+    [/EPARGNE|DEPOT/, "Épargne"],
+    [/CARBURANT|VOITURE|JUKE|VIDANGE|ESSENCE/, "Véhicule"],
+    [/CREDIT MTN|MOOV|INTERNET|EN LIGNE|TELEPHON/, "Communication"],
+    [/MARCHE|RAVITAIL|CUISINE|CUSINE|NOURRIT/, "Alimentation"],
+    [/ELECTRICITE|GAZ|ENTRETIEN|TRAVAUX|ORDURES|CANAL|LOYER|EAU\b|MAISON/, "Maison"],
+    [/SOIN|MEDIC|SANTE|PHARMA/, "Santé"],
+    [/POCHE|HABILLEMENT|PRESSING|TONDEUSE|COUTURE/, "Personnel"],
+  ];
+  for (const [re, g] of T) if (re.test(s)) return g;
+  return "Divers";
+}
+function prochainCode() {
+  let max = 0; for (const r of Object.values(D.rubriques)) { const n = parseInt(String(r.code).replace(/\D/g, ""), 10); if (n > max) max = n; }
+  return "P" + pad(max + 1);
+}
+function moisCourantParDefaut() {
+  const t = today(), ks = moisKeys();
+  for (const k of ks) { const m = D.mois[k]; if (m.debut && m.fin && m.debut <= t && t <= m.fin) return k; }
+  return ks[ks.length - 1] || "";
+}
+
+/* ==================== Fusion (synchronisation) ==================== */
+function mergeData(a, b) {
+  const out = emptyData();
+  const pick = (x, y) => (!x ? y : !y ? x : ((y.u || 0) > (x.u || 0) ? y : x));
+  for (const coll of ["rubriques", "depenses"]) {
+    const ids = new Set([...Object.keys(a[coll] || {}), ...Object.keys(b[coll] || {})]);
+    for (const id of ids) out[coll][id] = pick(a[coll]?.[id], b[coll]?.[id]);
+  }
+  const ks = new Set([...Object.keys(a.mois || {}), ...Object.keys(b.mois || {})]);
+  for (const k of ks) {
+    const x = a.mois?.[k], y = b.mois?.[k];
+    if (!x || !y) { out.mois[k] = JSON.parse(JSON.stringify(x || y)); continue; }
+    const base = JSON.parse(JSON.stringify(pick(x, y)));
+    base.alloc = {};
+    const rids = new Set([...Object.keys(x.alloc || {}), ...Object.keys(y.alloc || {})]);
+    for (const r of rids) base.alloc[r] = pick(x.alloc?.[r], y.alloc?.[r]);
+    out.mois[k] = base;
+  }
+  return out;
+}
+
+/* ==================== OneDrive (Microsoft Graph, OAuth PKCE) ==================== */
+const AUTH = "https://login.microsoftonline.com/consumers/oauth2/v2.0";
+const SCOPE = "Files.ReadWrite.AppFolder offline_access";
+const FILE_URL = "https://graph.microsoft.com/v1.0/me/drive/special/approot:/budget.json:/content";
+const redirectUri = () => location.origin + location.pathname;
+const b64url = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const Tok = {
+  get() { try { return JSON.parse(localStorage.getItem("budgetperso.tok") || "null"); } catch (e) { return null; } },
+  set(t) { localStorage.setItem("budgetperso.tok", JSON.stringify(t)); },
+  clear() { localStorage.removeItem("budgetperso.tok"); }
+};
+async function odLogin() {
+  if (!CFG.clientId) { toast("Saisissez d'abord l'ID d'application (Réglages)"); return; }
+  const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
+  const challenge = b64url(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)));
+  const state = b64url(crypto.getRandomValues(new Uint8Array(12)));
+  sessionStorage.setItem("pkce", JSON.stringify({ verifier, state }));
+  const p = new URLSearchParams({ client_id: CFG.clientId, response_type: "code", redirect_uri: redirectUri(), scope: SCOPE,
+    code_challenge: challenge, code_challenge_method: "S256", state, response_mode: "query", prompt: "select_account" });
+  location.href = AUTH + "/authorize?" + p;
+}
+async function odHandleRedirect() {
+  const q = new URLSearchParams(location.search);
+  if (!q.get("code") && !q.get("error")) return;
+  history.replaceState(null, "", redirectUri());
+  if (q.get("error")) { toast("Connexion refusée : " + (q.get("error_description") || q.get("error")), 5000); return; }
+  const saved = JSON.parse(sessionStorage.getItem("pkce") || "null");
+  if (!saved || saved.state !== q.get("state")) { toast("Connexion OneDrive : état invalide"); return; }
+  const r = await fetch(AUTH + "/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ client_id: CFG.clientId, grant_type: "authorization_code", code: q.get("code"), redirect_uri: redirectUri(), code_verifier: saved.verifier, scope: SCOPE }) });
+  const j = await r.json();
+  if (!r.ok) { toast("Erreur jeton : " + (j.error_description || j.error), 6000); return; }
+  Tok.set({ at: j.access_token, rt: j.refresh_token, exp: now() + (j.expires_in - 120) * 1000 });
+  toast("OneDrive connecté");
+}
+async function odToken() {
+  const t = Tok.get(); if (!t) return null;
+  if (t.exp > now()) return t.at;
+  if (!t.rt) return null;
+  const r = await fetch(AUTH + "/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ client_id: CFG.clientId, grant_type: "refresh_token", refresh_token: t.rt, scope: SCOPE }) });
+  const j = await r.json();
+  if (!r.ok) { Tok.clear(); throw new Error("Session OneDrive expirée : reconnectez-vous (Réglages)"); }
+  Tok.set({ at: j.access_token, rt: j.refresh_token || t.rt, exp: now() + (j.expires_in - 120) * 1000 });
+  return j.access_token;
+}
+/* Fichier local (Windows : fichier dans le dossier OneDrive synchronisé) */
+const FH = {
+  handle: null,
+  async db() { return new Promise((res, rej) => { const o = indexedDB.open("budgetperso", 1); o.onupgradeneeded = () => o.result.createObjectStore("kv"); o.onsuccess = () => res(o.result); o.onerror = () => rej(o.error); }); },
+  async load() { try { const db = await this.db(); return await new Promise(r => { const g = db.transaction("kv").objectStore("kv").get("fh"); g.onsuccess = () => r(g.result || null); g.onerror = () => r(null); }); } catch (e) { return null; } },
+  async store(h) { try { const db = await this.db(); db.transaction("kv", "readwrite").objectStore("kv").put(h, "fh"); } catch (e) {} },
+  async forget() { this.handle = null; try { const db = await this.db(); db.transaction("kv", "readwrite").objectStore("kv").delete("fh"); } catch (e) {} },
+  async perm(ask) { if (!this.handle) return false; const o = { mode: "readwrite" }; if (await this.handle.queryPermission(o) === "granted") return true; return ask ? (await this.handle.requestPermission(o)) === "granted" : false; }
+};
+const Sync = {
+  state: "off", msg: "", timer: null, running: false,
+  set(s, m) { this.state = s; this.msg = m || ""; const d = $("#syncdot"); d.className = s === "ok" ? "ok" : s === "busy" ? "busy" : s === "err" ? "err" : ""; d.title = m || s; if (CFG.vue === "reglages") renderReglages(); },
+  schedule() { clearTimeout(this.timer); this.timer = setTimeout(() => this.run(), 2500); },
+  async run(ask = false) {
+    if (this.running) { this.schedule(); return; }
+    const hasOD = !!Tok.get(), hasFH = !!FH.handle;
+    if (!hasOD && !hasFH) { this.set("off", "Aucune synchronisation configurée"); return; }
+    this.running = true; this.set("busy", "Synchronisation…");
+    try {
+      let merged = D;
+      if (hasOD) {
+        const at = await odToken(); if (!at) throw new Error("Non connecté à OneDrive");
+        let r = await fetch(FILE_URL, { headers: { Authorization: "Bearer " + at } });
+        if (r.ok) merged = mergeData(merged, await r.json());
+        else if (r.status !== 404) throw new Error("Lecture OneDrive : HTTP " + r.status);
+        const w = await fetch(FILE_URL, { method: "PUT", headers: { Authorization: "Bearer " + at, "Content-Type": "application/json" }, body: JSON.stringify(merged) });
+        if (!w.ok) throw new Error("Écriture OneDrive : HTTP " + w.status);
+      }
+      if (hasFH && await FH.perm(ask)) {
+        const f = await FH.handle.getFile(); const txt = await f.text();
+        if (txt.trim()) { try { merged = mergeData(merged, JSON.parse(txt)); } catch (e) {} }
+        const ws = await FH.handle.createWritable(); await ws.write(JSON.stringify(merged, null, 1)); await ws.close();
+      } else if (hasFH && !hasOD) { throw new Error("Autorisez l'accès au fichier (Réglages › Synchroniser)"); }
+      const changed = JSON.stringify(merged) !== JSON.stringify(D);
+      D = merged; save(false);
+      CFG.lastSync = now(); saveCfg();
+      this.set("ok", "Synchronisé à " + new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }));
+      if (changed) render();
+    } catch (e) { this.set("err", e.message || String(e)); }
+    finally { this.running = false; }
+  }
+};
+
+/* ==================== Rendu ==================== */
+function renderHeader() {
+  const sel = $("#moisSel"), ks = moisKeys();
+  sel.innerHTML = ks.length ? ks.slice().reverse().map(k => `<option value="${k}" ${k === CFG.mois ? "selected" : ""}>${moisTitre(k)}</option>`).join("") : `<option>Aucun mois</option>`;
+  const m = M();
+  $("#periodTxt").textContent = m ? `Période du ${fmtDate(m.debut)} au ${fmtDate(m.fin)}` : "Créez votre premier mois dans Budget";
+  document.querySelectorAll("nav button").forEach(b => b.classList.toggle("on", b.dataset.v === CFG.vue));
+}
+function render() {
+  if (!D.mois[CFG.mois] || D.mois[CFG.mois].del) CFG.mois = moisCourantParDefaut();
+  renderHeader();
+  ({ budget: renderBudget, depense: renderDepense, soldes: renderSoldes, rapports: renderRapports, reglages: renderReglages }[CFG.vue] || renderBudget)();
+}
+function setVue(v) { CFG.vue = v; saveCfg(); render(); window.scrollTo(0, 0); }
+
+/* ---------- Budget (allocations) ---------- */
+function renderBudget() {
+  const main = $("#main"), k = CFG.mois, m = M();
+  if (!m) {
+    main.innerHTML = `<div class="card"><h2>Bienvenue</h2>
+      <p>Commencez en important votre classeur Excel actuel (chaque onglet devient un mois), ou créez un mois vide.</p>
+      <div class="btns"><button class="btn pri" onclick="importerExcel()">Importer le fichier Excel</button>
+      <button class="btn" onclick="dlgNouveauMois()">Créer un mois</button></div>
+      <p class="small muted">Pour retrouver vos données sur le téléphone et l'ordinateur, configurez OneDrive dans Réglages.</p></div>`;
+    return;
+  }
+  const pk = prevKeyOf(k), pm = D.mois[pk] && !D.mois[pk].del ? pk : null;
+  const pdep = pm ? depenseParRub(pm) : {};
+  const rs = moisRubs(k);
+  let html = `<div class="card"><h2>Revenus du mois</h2>`;
+  (m.revenus || []).forEach((r, i) => { if (r.del) return;
+    const prevR = pm ? (D.mois[pm].revenus || []).find(x => !x.del && norm(x.lib) === norm(r.lib)) : null;
+    html += `<div class="rub"><span class="code">R${i + 1}</span><div><div class="lib" onclick="dlgRevenu(${i})">${esc(r.lib)}</div>${prevR ? `<div class="prev">Mois préc. : ${fmt(prevR.m)}</div>` : ""}</div>
+      <input class="amt" inputmode="numeric" value="${fmtN(r.m)}" onfocus="this.select()" onchange="setRevenu(${i},this.value)"></div>`; });
+  html += `<div class="btns" style="margin-top:8px"><button class="btn" onclick="dlgRevenu(-1)">+ Revenu</button></div></div>`;
+
+  html += `<div class="card"><h2>Rubriques et plafonds</h2>
+    <div class="btns" style="margin-bottom:6px">
+      ${pm ? `<button class="btn" onclick="reconduire()">Reconduire les montants de ${moisTitre(pm)}</button>` : ""}
+      <button class="btn" onclick="dlgRubrique(null)">+ Rubrique</button>
+    </div>`;
+  if (!rs.length) html += `<div class="empty">Aucune rubrique dans ce mois.</div>`;
+  let lastG = null;
+  for (const r of rs) {
+    if (r.groupe !== lastG) { html += `<div class="grp">${esc(r.groupe)}</div>`; lastG = r.groupe; }
+    const pa = pm ? alloue(pm, r.id) : null, pd = pm ? (pdep[r.id] || 0) : null;
+    html += `<div class="rub"><span class="code">${esc(r.code)}</span>
+      <div><div class="lib" onclick="dlgRubrique('${r.id}')">${esc(r.libelle)}</div>
+      ${pm ? `<div class="prev">Mois préc. : alloué ${fmt(pa)} · dépensé <span class="${pd > pa ? "neg" : ""}">${fmt(pd)}</span></div>` : ""}</div>
+      <input class="amt" inputmode="numeric" value="${fmtN(alloue(k, r.id))}" onfocus="this.select()" onchange="setAlloc('${r.id}',this.value)"></div>`;
+  }
+  const absentes = rubs().filter(r => r.actif !== false && !(m.alloc[r.id] && !m.alloc[r.id].del));
+  if (absentes.length) html += `<div class="btns" style="margin-top:10px"><button class="btn" onclick="dlgAjouterExistante()">Ajouter une rubrique existante (${absentes.length})</button></div>`;
+  html += `</div>`;
+  const t = totaux(k);
+  html += `<div class="sticky-tot">
+    <div class="t"><span>Total alloué</span><b>${fmt(t.alloue)}</b></div>
+    <div class="t"><span>Revenus</span><b>${fmt(t.revenus)}</b></div>
+    <div class="t"><span>Solde (revenus − alloué)</span><b class="${t.nonAlloue < 0 ? "neg" : "pos"}">${fmt(t.nonAlloue)}</b></div></div>
+    <div class="card" style="margin-top:12px"><h2>Mois</h2><div class="btns">
+      <button class="btn pri" onclick="dlgNouveauMois()">Créer le mois suivant</button>
+      <button class="btn" onclick="dlgPeriode()">Modifier la période</button>
+      <button class="btn bad" onclick="supprimerMois()">Supprimer ce mois</button></div></div>`;
+  main.innerHTML = html;
+}
+function setAlloc(rid, v) { const m = M(); m.alloc[rid] = { m: parseAmt(v), u: now() }; save(); renderBudget(); }
+function setRevenu(i, v) { const m = M(); m.revenus[i].m = parseAmt(v); m.u = now(); save(); renderBudget(); }
+function reconduire() {
+  const k = CFG.mois, pk = prevKeyOf(k), m = M(), p = D.mois[pk];
+  if (!p) return;
+  if (!confirm(`Remplacer les montants de ${moisTitre(k)} par ceux de ${moisTitre(pk)} ?`)) return;
+  const t = now();
+  for (const [rid, a] of Object.entries(p.alloc)) if (!a.del && D.rubriques[rid]?.actif !== false) m.alloc[rid] = { m: a.m, u: t };
+  m.revenus = JSON.parse(JSON.stringify((p.revenus || []).filter(r => !r.del))); m.u = t;
+  save(); render(); toast("Montants reconduits");
+}
+function dlgNouveauMois() {
+  const ks = moisKeys(), last = ks[ks.length - 1];
+  const k = last ? nextKey(last) : today().slice(0, 7);
+  const lm = last ? D.mois[last] : null;
+  const debut = lm?.fin ? addDays(lm.fin, 1) : today();
+  const fin = addDays(addMonths(debut, 1), -1);
+  openDlg(`<h2 style="margin-top:0">Nouveau mois</h2>
+    <label class="f">Mois budgétaire</label><input type="month" id="nm_k" value="${k}">
+    <label class="f">Début de période</label><input type="date" id="nm_d" value="${debut}">
+    <label class="f">Fin de période</label><input type="date" id="nm_f" value="${fin}">
+    ${last ? `<label class="f"><input type="checkbox" id="nm_c" checked style="width:auto"> Reconduire rubriques, plafonds et revenus de ${moisTitre(last)}</label>` : ""}
+    <div class="btns" style="margin-top:14px;justify-content:flex-end"><button class="btn" onclick="closeDlg()">Annuler</button><button class="btn pri" id="nm_ok">Créer</button></div>`);
+  $("#nm_ok").onclick = () => {
+    const nk = $("#nm_k").value; if (!/^\d{4}-\d{2}$/.test(nk)) return;
+    if (D.mois[nk] && !D.mois[nk].del) { toast("Ce mois existe déjà"); return; }
+    const t = now(), copy = last && $("#nm_c")?.checked;
+    const m = { key: nk, debut: $("#nm_d").value, fin: $("#nm_f").value, revenus: [], alloc: {}, u: t };
+    if (copy) {
+      for (const [rid, a] of Object.entries(lm.alloc)) if (!a.del && D.rubriques[rid]?.actif !== false) m.alloc[rid] = { m: a.m, u: t };
+      m.revenus = JSON.parse(JSON.stringify((lm.revenus || []).filter(r => !r.del)));
+    } else { m.revenus = [{ lib: "SALAIRE", m: 0 }]; for (const r of rubs()) if (r.actif !== false) m.alloc[r.id] = { m: 0, u: t }; }
+    D.mois[nk] = m; CFG.mois = nk; saveCfg(); save(); closeDlg(); render(); toast(moisTitre(nk) + " créé");
+  };
+}
+function dlgPeriode() {
+  const m = M();
+  openDlg(`<h2 style="margin-top:0">Période de ${moisTitre(CFG.mois)}</h2>
+    <label class="f">Début</label><input type="date" id="pd_d" value="${m.debut || ""}">
+    <label class="f">Fin</label><input type="date" id="pd_f" value="${m.fin || ""}">
+    <div class="btns" style="margin-top:14px;justify-content:flex-end"><button class="btn" onclick="closeDlg()">Annuler</button><button class="btn pri" id="pd_ok">Enregistrer</button></div>`);
+  $("#pd_ok").onclick = () => { m.debut = $("#pd_d").value; m.fin = $("#pd_f").value; m.u = now(); save(); closeDlg(); render(); };
+}
+function supprimerMois() {
+  const k = CFG.mois, n = depsMois(k).length;
+  if (!confirm(`Supprimer ${moisTitre(k)}${n ? ` et ses ${n} dépenses` : ""} ? Cette action est définitive.`)) return;
+  const t = now(); D.mois[k].del = true; D.mois[k].u = t;
+  for (const d of depsMois(k)) { d.del = true; d.u = t; }
+  CFG.mois = ""; save(); render();
+}
+function dlgRevenu(i) {
+  const m = M(), r = i >= 0 ? m.revenus[i] : { lib: "", m: 0 };
+  openDlg(`<h2 style="margin-top:0">${i >= 0 ? "Modifier le revenu" : "Nouveau revenu"}</h2>
+    <label class="f">Libellé</label><input id="rv_l" value="${esc(r.lib)}">
+    <label class="f">Montant</label><input id="rv_m" class="amt" inputmode="numeric" value="${fmtN(r.m)}">
+    <div class="btns" style="margin-top:14px;justify-content:space-between">${i >= 0 ? `<button class="btn bad" id="rv_x">Supprimer</button>` : "<span></span>"}
+    <span class="btns"><button class="btn" onclick="closeDlg()">Annuler</button><button class="btn pri" id="rv_ok">OK</button></span></div>`);
+  $("#rv_ok").onclick = () => { const lib = $("#rv_l").value.trim() || "Revenu"; const v = parseAmt($("#rv_m").value);
+    if (i >= 0) { r.lib = lib; r.m = v; } else m.revenus.push({ lib, m: v }); m.u = now(); save(); closeDlg(); render(); };
+  if (i >= 0) $("#rv_x").onclick = () => { m.revenus.splice(i, 1); m.u = now(); save(); closeDlg(); render(); };
+}
+function dlgRubrique(rid) {
+  const r = rid ? D.rubriques[rid] : { code: prochainCode(), libelle: "", groupe: "Divers" };
+  const groupes = [...new Set([...GROUPES, ...Object.values(D.rubriques).map(x => x.groupe)])];
+  openDlg(`<h2 style="margin-top:0">${rid ? "Modifier la rubrique" : "Nouvelle rubrique"}</h2>
+    <label class="f">Code</label><input id="rb_c" value="${esc(r.code)}">
+    <label class="f">Libellé</label><textarea id="rb_l" rows="2">${esc(r.libelle)}</textarea>
+    <label class="f">Groupe (pour les rapports)</label><select id="rb_g">${groupes.map(g => `<option ${g === r.groupe ? "selected" : ""}>${esc(g)}</option>`).join("")}</select>
+    ${rid ? "" : `<label class="f">Plafond pour ${moisTitre(CFG.mois)}</label><input id="rb_m" class="amt" inputmode="numeric" value="0">`}
+    ${rid ? `<div class="btns" style="margin-top:10px"><button class="btn" id="rb_up">↑ Monter</button><button class="btn" id="rb_dn">↓ Descendre</button><button class="btn bad" id="rb_rm">Retirer de ce mois</button></div>` : ""}
+    <div class="btns" style="margin-top:14px;justify-content:flex-end"><button class="btn" onclick="closeDlg()">Annuler</button><button class="btn pri" id="rb_ok">Enregistrer</button></div>`);
+  $("#rb_ok").onclick = () => {
+    const t = now(); const lib = $("#rb_l").value.trim(); if (!lib) { toast("Libellé requis"); return; }
+    if (rid) Object.assign(r, { code: $("#rb_c").value.trim(), libelle: lib, groupe: $("#rb_g").value, u: t });
+    else {
+      const id = uid(), maxO = Math.max(0, ...Object.values(D.rubriques).map(x => x.ordre || 0));
+      D.rubriques[id] = { id, code: $("#rb_c").value.trim() || prochainCode(), libelle: lib, groupe: $("#rb_g").value, ordre: maxO + 10, actif: true, u: t };
+      M().alloc[id] = { m: parseAmt($("#rb_m").value), u: t };
+    }
+    save(); closeDlg(); render();
+  };
+  if (rid) {
+    const move = dir => { const list = moisRubs(CFG.mois); const i = list.findIndex(x => x.id === rid), j = i + dir; if (j < 0 || j >= list.length) return;
+      const o = list[j].ordre; list[j].ordre = r.ordre; r.ordre = o; if (list[j].ordre === r.ordre) r.ordre += dir; const t = now(); list[j].u = t; r.u = t; save(); render(); };
+    $("#rb_up").onclick = () => move(-1); $("#rb_dn").onclick = () => move(1);
+    $("#rb_rm").onclick = () => { const n = depsMois(CFG.mois).filter(d => d.rub === rid).length;
+      if (n) { toast(`Impossible : ${n} dépense(s) saisie(s) sur cette rubrique ce mois-ci`, 3500); return; }
+      M().alloc[rid] = { m: 0, del: true, u: now() }; save(); closeDlg(); render(); };
+  }
+}
+function dlgAjouterExistante() {
+  const m = M(), list = rubs().filter(r => r.actif !== false && !(m.alloc[r.id] && !m.alloc[r.id].del));
+  openDlg(`<h2 style="margin-top:0">Ajouter une rubrique</h2>
+    <select id="ae_r">${list.map(r => `<option value="${r.id}">${esc(r.code)} · ${esc(r.libelle)}</option>`).join("")}</select>
+    <label class="f">Plafond</label><input id="ae_m" class="amt" inputmode="numeric" value="0">
+    <div class="btns" style="margin-top:14px;justify-content:flex-end"><button class="btn" onclick="closeDlg()">Annuler</button><button class="btn pri" id="ae_ok">Ajouter</button></div>`);
+  $("#ae_ok").onclick = () => { m.alloc[$("#ae_r").value] = { m: parseAmt($("#ae_m").value), u: now() }; save(); closeDlg(); render(); };
+}
+
+/* ---------- Saisie de dépense ---------- */
+function renderDepense() {
+  const main = $("#main"), k = CFG.mois, m = M();
+  if (!m) { main.innerHTML = `<div class="empty">Créez d'abord un mois dans l'onglet Budget.</div>`; return; }
+  const rs = moisRubs(k), dp = depenseParRub(k);
+  const last = CFG.lastRub && rs.find(r => r.id === CFG.lastRub) ? CFG.lastRub : rs[0]?.id;
+  const def = (m.debut <= today() && today() <= m.fin) ? today() : (m.debut || today());
+  let html = `<div class="card"><h2>Valider une dépense</h2>
+    <label class="f">Rubrique</label>
+    <select id="dp_r">${rs.map(r => { const rest = alloue(k, r.id) - (dp[r.id] || 0); return `<option value="${r.id}" ${r.id === last ? "selected" : ""}>${esc(r.code)} · ${esc(r.libelle.split("\n")[0])} (reste ${fmtN(rest)})</option>`; }).join("")}</select>
+    <div id="dp_info" class="small" style="margin-top:6px"></div>
+    <label class="f">Montant (F CFA)</label><input id="dp_m" class="amt" inputmode="numeric" placeholder="0" style="font-size:20px">
+    <label class="f">Date</label><input id="dp_d" type="date" value="${def}">
+    <label class="f">Note (facultatif)</label><input id="dp_n" placeholder="ex. Station Total Cadjehoun">
+    <div class="btns" style="margin-top:12px"><button class="btn pri" id="dp_ok" style="flex:1;padding:12px">Valider la dépense</button></div></div>`;
+  const list = depsMois(k).sort((a, b) => (b.date || "").localeCompare(a.date || "") || b.u - a.u);
+  html += `<div class="card"><h2>Dépenses de ${moisTitre(k)} <span class="pill">${list.length}</span></h2>`;
+  html += list.length ? list.slice(0, 60).map(depLigne).join("") : `<div class="empty">Aucune dépense saisie.</div>`;
+  if (list.length > 60) html += `<p class="small muted">… ${list.length - 60} plus anciennes (voir Soldes › rubrique)</p>`;
+  html += `</div>`;
+  main.innerHTML = html;
+  const info = () => { const rid = $("#dp_r").value; if (!rid) return; const a = alloue(k, rid), s = dp[rid] || 0, v = parseAmt($("#dp_m").value), rest = a - s;
+    $("#dp_info").innerHTML = `Plafond ${fmt(a)} · déjà dépensé ${fmt(s)} · reste <b class="${rest < 0 ? "neg" : "pos"}">${fmt(rest)}</b>` +
+      (v ? ` · après validation <b class="${rest - v < 0 ? "neg" : "pos"}">${fmt(rest - v)}</b>` : ""); };
+  $("#dp_r").onchange = info; $("#dp_m").oninput = info; info();
+  $("#dp_ok").onclick = () => {
+    const rid = $("#dp_r").value, v = parseAmt($("#dp_m").value);
+    if (!rid) { toast("Choisissez une rubrique"); return; }
+    if (v <= 0) { toast("Montant invalide"); $("#dp_m").focus(); return; }
+    const rest = alloue(k, rid) - (dp[rid] || 0);
+    if (v > rest && !confirm(`Cette dépense dépasse le plafond de ${fmt(v - Math.max(rest, 0))}. Valider quand même ?`)) return;
+    const id = uid(); D.depenses[id] = { id, mois: k, rub: rid, date: $("#dp_d").value || today(), montant: v, note: $("#dp_n").value.trim(), u: now() };
+    CFG.lastRub = rid; saveCfg(); save(); toast("Dépense validée : " + fmt(v)); renderDepense();
+  };
+}
+function depLigne(d) {
+  const r = D.rubriques[d.rub];
+  return `<div class="dep"><div><div>${esc(r ? r.code + " · " + r.libelle.split("\n")[0] : "?")}</div><div class="small muted">${fmtDate(d.date)}${d.note ? " · " + esc(d.note) : ""}</div></div>
+    <div style="display:flex;align-items:center;gap:4px"><b style="white-space:nowrap">${fmt(d.montant)}</b><button class="x" title="Supprimer" onclick="supprDep('${d.id}')">×</button></div></div>`;
+}
+function supprDep(id) { const d = D.depenses[id]; if (!confirm(`Supprimer la dépense de ${fmt(d.montant)} du ${fmtDate(d.date)} ?`)) return; d.del = true; d.u = now(); save(); render(); }
+
+/* ---------- Soldes ---------- */
+function renderSoldes() {
+  const main = $("#main"), k = CFG.mois;
+  if (!M()) { main.innerHTML = `<div class="empty">Aucun mois.</div>`; return; }
+  const t = totaux(k), dp = depenseParRub(k), rs = moisRubs(k);
+  const m = M(); let pct = "";
+  if (m.debut && m.fin) { const a = new Date(m.debut + "T00:00"), b = new Date(m.fin + "T23:59"), n = new Date(); const p = Math.min(1, Math.max(0, (n - a) / (b - a))); pct = Math.round(p * 100); }
+  let html = `<div class="card"><h2>Synthèse de ${moisTitre(k)}</h2><div class="grid">
+    <div class="kpi"><div class="l">Revenus</div><div class="v">${fmt(t.revenus)}</div></div>
+    <div class="kpi"><div class="l">Total alloué</div><div class="v">${fmt(t.alloue)}</div></div>
+    <div class="kpi"><div class="l">Total dépensé</div><div class="v">${fmt(t.depense)}</div></div>
+    <div class="kpi"><div class="l">Reste à dépenser (alloué − dépensé)</div><div class="v ${t.reste < 0 ? "neg" : "pos"}">${fmt(t.reste)}</div></div>
+    <div class="kpi"><div class="l">Solde réel (revenus − dépensé)</div><div class="v ${t.soldeReel < 0 ? "neg" : "pos"}">${fmt(t.soldeReel)}</div></div>
+    <div class="kpi"><div class="l">Non alloué (revenus − alloué)</div><div class="v ${t.nonAlloue < 0 ? "neg" : ""}">${fmt(t.nonAlloue)}</div></div>
+    </div>${pct !== "" ? `<p class="small muted" style="margin:8px 0 0">${pct} % de la période écoulée · ${t.alloue ? Math.round(t.depense / t.alloue * 100) : 0} % du budget consommé</p>` : ""}</div>`;
+  html += `<div class="card"><h2>Solde par rubrique</h2>`;
+  let lastG = null;
+  for (const r of rs) {
+    if (r.groupe !== lastG) { html += `<div class="grp">${esc(r.groupe)}</div>`; lastG = r.groupe; }
+    const a = alloue(k, r.id), s = dp[r.id] || 0, rest = a - s, p = a ? s / a : (s ? 2 : 0);
+    html += `<div class="sold" onclick="dlgDetailRub('${r.id}')"><div class="t"><span><span class="code" style="color:var(--brand);font-weight:700;font-size:12px">${esc(r.code)}</span> ${esc(r.libelle.split("\n")[0])}</span><b class="${rest < 0 ? "neg" : ""}">${fmt(rest)}</b></div>
+      <div class="bar"><i class="${p > 1 ? "b" : p > .85 ? "w" : ""}" style="width:${Math.min(100, p * 100)}%"></i></div>
+      <div class="small muted">${fmt(s)} dépensé sur ${fmt(a)}${a ? " · " + Math.round(p * 100) + " %" : ""}</div></div>`;
+  }
+  html += `</div>`;
+  main.innerHTML = html;
+}
+function dlgDetailRub(rid) {
+  const k = CFG.mois, r = D.rubriques[rid], list = depsMois(k).filter(d => d.rub === rid).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  const a = alloue(k, rid), s = list.reduce((x, d) => x + d.montant, 0);
+  openDlg(`<h2 style="margin-top:0">${esc(r.code)} · ${esc(r.libelle)}</h2>
+    <p class="small">Plafond ${fmt(a)} · dépensé ${fmt(s)} · reste <b class="${a - s < 0 ? "neg" : "pos"}">${fmt(a - s)}</b></p>
+    <div>${list.length ? list.map(depLigne).join("") : `<div class="empty">Aucune dépense.</div>`}</div>
+    <div class="btns" style="margin-top:12px;justify-content:flex-end"><button class="btn" onclick="closeDlg()">Fermer</button><button class="btn pri" onclick="closeDlg();CFG.lastRub='${rid}';setVue('depense')">Saisir une dépense</button></div>`);
+}
+
+/* ---------- Rapports ---------- */
+function svgBarsMois(rows) {
+  // rows: [{k, revenus, alloue, depense}]
+  const W = Math.max(320, rows.length * 70), H = 200, pl = 46, pb = 22, pt = 8;
+  const max = Math.max(1, ...rows.flatMap(r => [r.revenus, r.alloue, r.depense]));
+  const step = (W - pl - 6) / rows.length, bw = Math.min(16, step / 4);
+  const y = v => pt + (H - pt - pb) * (1 - v / max);
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="min-width:${Math.min(W, 600)}px" role="img" aria-label="Revenus, alloué et dépensé par mois">`;
+  for (let i = 0; i <= 4; i++) { const v = max * i / 4; s += `<line x1="${pl}" x2="${W}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${pl - 4}" y="${y(v) + 4}" text-anchor="end">${v >= 1e6 ? (v / 1e6).toFixed(1) + "M" : Math.round(v / 1e3) + "k"}</text>`; }
+  rows.forEach((r, i) => {
+    const x0 = pl + step * i + step / 2 - bw * 1.5 - 2;
+    [["revenus", "var(--rev)"], ["alloue", "var(--alloc)"], ["depense", "var(--spent)"]].forEach(([f, c], j) => {
+      s += `<rect x="${x0 + j * (bw + 2)}" y="${y(r[f])}" width="${bw}" height="${Math.max(0, H - pb - y(r[f]))}" fill="${c}" rx="2"><title>${moisTitre(r.k)} · ${f === "alloue" ? "alloué" : f === "depense" ? "dépensé" : "revenus"} : ${fmt(r[f])}</title></rect>`; });
+    s += `<text x="${pl + step * i + step / 2}" y="${H - 6}" text-anchor="middle">${moisShort(r.k)}</text>`;
+  });
+  return s + `</svg>`;
+}
+function hbars(items, total, colorFn) {
+  return items.map((it, i) => `<div style="margin:6px 0"><div class="t" style="display:flex;justify-content:space-between;gap:8px;font-size:13px"><span>${esc(it.label)}</span><b style="white-space:nowrap">${fmt(it.v)}${total ? ` · ${Math.round(it.v / total * 100)} %` : ""}</b></div>
+    <div class="bar" style="height:10px"><i style="width:${total ? Math.min(100, it.v / Math.max(...items.map(x => x.v), 1) * 100) : 0}%;background:${colorFn ? colorFn(it, i) : "var(--alloc)"}"></i></div></div>`).join("");
+}
+function svgRythme(k) {
+  const m = D.mois[k]; if (!m?.debut || !m?.fin) return "";
+  const a = new Date(m.debut + "T12:00"), b = new Date(m.fin + "T12:00"), days = Math.max(1, Math.round((b - a) / 864e5) + 1);
+  const t = totaux(k); const cum = new Array(days).fill(0);
+  for (const d of depsMois(k)) { const i = Math.round((new Date(d.date + "T12:00") - a) / 864e5); cum[Math.min(days - 1, Math.max(0, i))] += d.montant; }
+  for (let i = 1; i < days; i++) cum[i] += cum[i - 1];
+  const todayIdx = Math.min(days - 1, Math.round((new Date(today() + "T12:00") - a) / 864e5));
+  const W = 600, H = 180, pl = 46, pb = 20, pt = 8, max = Math.max(1, t.alloue, cum[days - 1]);
+  const x = i => pl + (W - pl - 6) * i / (days - 1 || 1), y = v => pt + (H - pt - pb) * (1 - v / max);
+  const lim = Math.max(0, Math.min(days - 1, todayIdx));
+  let pts = []; for (let i = 0; i <= lim; i++) pts.push(x(i) + "," + y(cum[i]));
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Rythme de dépense">`;
+  for (let i = 0; i <= 4; i++) { const v = max * i / 4; s += `<line x1="${pl}" x2="${W}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${pl - 4}" y="${y(v) + 4}" text-anchor="end">${v >= 1e6 ? (v / 1e6).toFixed(1) + "M" : Math.round(v / 1e3) + "k"}</text>`; }
+  s += `<line x1="${x(0)}" y1="${y(0)}" x2="${x(days - 1)}" y2="${y(t.alloue)}" stroke="var(--alloc)" stroke-width="2" stroke-dasharray="5 4"/>`;
+  if (todayIdx >= 0) s += `<polyline points="${pts.join(" ")}" fill="none" stroke="var(--spent)" stroke-width="2.5"/>`;
+  s += `<text x="${x(0)}" y="${H - 4}">${fmtDate(m.debut).slice(0, 5)}</text><text x="${x(days - 1)}" y="${H - 4}" text-anchor="end">${fmtDate(m.fin).slice(0, 5)}</text>`;
+  return s + `</svg><div class="legend"><span style="--c:var(--alloc)">Budget linéaire</span><span style="--c:var(--spent)">Dépensé cumulé</span></div>`;
+}
+function renderRapports() {
+  const main = $("#main"), ks = moisKeys(), k = CFG.mois;
+  if (!ks.length) { main.innerHTML = `<div class="empty">Aucune donnée.</div>`; return; }
+  const n = Math.min(CFG.nbMois || 6, ks.length), sel = ks.filter(x => x <= k).slice(-n);
+  const rows = sel.map(x => Object.assign({ k: x }, totaux(x)));
+  let html = `<div class="card"><h2>Évolution mensuelle</h2>
+    <div class="btns small" style="margin-bottom:6px">${[3, 6, 12, 24].map(v => `<button class="btn ${n === Math.min(v, ks.length) && (CFG.nbMois || 6) === v ? "pri" : ""}" onclick="CFG.nbMois=${v};saveCfg();renderRapports()">${v} mois</button>`).join("")}</div>
+    <div class="scroll">${svgBarsMois(rows)}</div>
+    <div class="legend"><span style="--c:var(--rev)">Revenus</span><span style="--c:var(--alloc)">Alloué</span><span style="--c:var(--spent)">Dépensé</span></div>
+    <div class="scroll" style="margin-top:8px"><table><tr><th>Mois</th><th>Revenus</th><th>Alloué</th><th>Dépensé</th><th>Exécution</th><th>Solde réel</th></tr>
+    ${rows.map(r => `<tr><td>${moisTitre(r.k)}</td><td>${fmtN(r.revenus)}</td><td>${fmtN(r.alloue)}</td><td>${fmtN(r.depense)}</td><td>${r.alloue ? Math.round(r.depense / r.alloue * 100) : 0} %</td><td class="${r.soldeReel < 0 ? "neg" : ""}">${fmtN(r.soldeReel)}</td></tr>`).join("")}
+    </table></div></div>`;
+  // Répartition par groupe (mois sélectionné)
+  const dp = depenseParRub(k), g = {}, ga = {};
+  for (const r of moisRubs(k)) { g[r.groupe] = (g[r.groupe] || 0) + (dp[r.id] || 0); ga[r.groupe] = (ga[r.groupe] || 0) + alloue(k, r.id); }
+  const t = totaux(k), useSpent = t.depense > 0;
+  const gi = Object.keys(ga).map(label => ({ label, v: useSpent ? g[label] || 0 : ga[label] })).sort((a, b) => b.v - a.v);
+  const colorOf = lbl => GROUP_COLORS[Math.max(0, GROUPES.indexOf(lbl)) % GROUP_COLORS.length];
+  html += `<div class="card"><h2>Répartition par groupe · ${moisTitre(k)}</h2><p class="small muted" style="margin:0">${useSpent ? "Montants dépensés" : "Aucune dépense encore : montants alloués"}</p>
+    ${hbars(gi, useSpent ? t.depense : t.alloue, it => colorOf(it.label))}</div>`;
+  // Rythme
+  html += `<div class="card"><h2>Rythme de dépense · ${moisTitre(k)}</h2>${svgRythme(k)}</div>`;
+  // Top rubriques et dépassements
+  const top = moisRubs(k).map(r => ({ label: r.code + " · " + r.libelle.split("\n")[0], v: dp[r.id] || 0, a: alloue(k, r.id) })).filter(x => x.v > 0).sort((a, b) => b.v - a.v).slice(0, 10);
+  html += `<div class="card"><h2>Top 10 des dépenses · ${moisTitre(k)}</h2>${top.length ? hbars(top, t.depense, it => it.v > it.a ? "var(--bad)" : "var(--spent)") : `<div class="empty">Aucune dépense.</div>`}</div>`;
+  // Indicateurs
+  const ep = moisRubs(k).filter(r => r.groupe === "Épargne").reduce((s, r) => s + (useSpent ? (dp[r.id] || 0) : alloue(k, r.id)), 0);
+  const nbDep = depsMois(k).length, depass = moisRubs(k).filter(r => (dp[r.id] || 0) > alloue(k, r.id));
+  html += `<div class="card"><h2>Indicateurs · ${moisTitre(k)}</h2><div class="grid">
+    <div class="kpi"><div class="l">Taux d'épargne</div><div class="v">${t.revenus ? Math.round(ep / t.revenus * 100) : 0} %</div></div>
+    <div class="kpi"><div class="l">Taux d'exécution</div><div class="v">${t.alloue ? Math.round(t.depense / t.alloue * 100) : 0} %</div></div>
+    <div class="kpi"><div class="l">Nombre de dépenses</div><div class="v">${nbDep}</div></div>
+    <div class="kpi"><div class="l">Dépense moyenne</div><div class="v">${fmt(nbDep ? t.depense / nbDep : 0)}</div></div>
+    <div class="kpi"><div class="l">Rubriques en dépassement</div><div class="v ${depass.length ? "neg" : "pos"}">${depass.length}</div></div>
+    </div>${depass.length ? `<p class="small" style="margin:8px 0 0">Dépassements : ${depass.map(r => `${esc(r.code)} (+${fmtN((dp[r.id] || 0) - alloue(k, r.id))})`).join(", ")}</p>` : ""}</div>`;
+  // Statistiques par rubrique sur la période
+  const stat = rubs().map(r => {
+    const vals = sel.filter(x => D.mois[x].alloc[r.id] && !D.mois[x].alloc[r.id].del).map(x => ({ a: alloue(x, r.id), s: depenseParRub(x)[r.id] || 0 }));
+    if (!vals.length) return null;
+    const ss = vals.map(v => v.s), moy = ss.reduce((a, b) => a + b, 0) / ss.length;
+    const am = vals.reduce((a, b) => a + b.a, 0) / vals.length;
+    return { r, n: vals.length, moy, am, min: Math.min(...ss), max: Math.max(...ss), dep: vals.filter(v => v.s > v.a).length };
+  }).filter(Boolean);
+  html += `<div class="card"><h2>Statistiques par rubrique (${sel.length} mois)</h2><div class="scroll"><table>
+    <tr><th>Rubrique</th><th>Plafond moy.</th><th>Dépense moy.</th><th>Min</th><th>Max</th><th>Dépass.</th></tr>
+    ${stat.map(x => `<tr><td>${esc(x.r.code)} · ${esc(x.r.libelle.split("\n")[0].slice(0, 32))}</td><td>${fmtN(x.am)}</td><td>${fmtN(x.moy)}</td><td>${fmtN(x.min)}</td><td>${fmtN(x.max)}</td><td class="${x.dep ? "neg" : ""}">${x.dep}/${x.n}</td></tr>`).join("")}
+    </table></div><p class="small muted">Astuce : une rubrique toujours sous-consommée peut voir son plafond réduit au profit de l'épargne.</p></div>`;
+  main.innerHTML = html;
+}
+
+/* ---------- Réglages ---------- */
+function renderReglages() {
+  const main = $("#main"); if (CFG.vue !== "reglages") return;
+  const od = !!Tok.get(), fsa = "showSaveFilePicker" in window;
+  main.innerHTML = `<div class="card"><h2>Synchronisation OneDrive</h2>
+    <p class="small">État : <b class="${Sync.state === "err" ? "neg" : Sync.state === "ok" ? "pos" : ""}">${esc(Sync.msg || (od || FH.handle ? "Prête" : "Non configurée"))}</b>${CFG.lastSync ? ` · dernière synchro ${new Date(CFG.lastSync).toLocaleString("fr-FR")}` : ""}</p>
+    <h2 style="margin-top:12px;font-size:14px">Méthode 1 · Compte Microsoft (ordinateur et téléphone)</h2>
+    <label class="f">ID d'application (client ID)</label><input id="st_cid" value="${esc(CFG.clientId)}" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+    <p class="small muted">Adresse de redirection à déclarer : <code>${esc(redirectUri())}</code></p>
+    <div class="btns">${od ? `<button class="btn" onclick="Sync.run(true)">Synchroniser</button><button class="btn bad" onclick="Tok.clear();Sync.set('off','Déconnecté');render()">Déconnecter</button>`
+      : `<button class="btn pri" onclick="CFG.clientId=$('#st_cid').value.trim();saveCfg();odLogin()">Se connecter à OneDrive</button>`}</div>
+    <p class="small muted">Le fichier est enregistré dans OneDrive › Applications › (nom de l'application) › budget.json.</p>
+    <h2 style="margin-top:12px;font-size:14px">Méthode 2 · Fichier dans le dossier OneDrive (Windows seulement)</h2>
+    ${fsa ? `<p class="small">${FH.handle ? "Fichier lié : <b>" + esc(FH.handle.name) + "</b>" : "Aucun fichier lié."}</p>
+      <div class="btns"><button class="btn" onclick="lierFichier(false)">Créer budget.json</button><button class="btn" onclick="lierFichier(true)">Ouvrir un budget.json existant</button>${FH.handle ? `<button class="btn" onclick="Sync.run(true)">Synchroniser</button><button class="btn bad" onclick="FH.forget().then(render)">Délier</button>` : ""}</div>`
+      : `<p class="small muted">Non disponible sur ce navigateur (utilisez Edge ou Chrome sur Windows).</p>`}
+  </div>
+  <div class="card"><h2>Import / export</h2><div class="btns">
+    <button class="btn" onclick="importerExcel()">Importer un classeur Excel</button>
+    <button class="btn" onclick="exporterExcel()">Exporter en Excel</button>
+    <button class="btn" onclick="exporterJSON()">Sauvegarde (JSON)</button>
+    <button class="btn" onclick="importerJSON()">Restaurer / fusionner un JSON</button></div>
+    <p class="small muted">L'import Excel lit chaque onglet (ex. « DEC 2026 ») : codes en colonne B, rubriques en C, montants en D, ligne SALAIRE comme revenu, et la période dans le titre.</p></div>
+  <div class="card"><h2>Données</h2><p class="small">${Object.keys(D.rubriques).length} rubriques · ${moisKeys().length} mois · ${Object.values(D.depenses).filter(d => !d.del).length} dépenses</p>
+    <div class="btns"><button class="btn bad" onclick="toutEffacer()">Effacer les données de cet appareil</button></div></div>
+  <p class="small muted" style="text-align:center">Budget Perso · v1.0</p>`;
+}
+async function lierFichier(open) {
+  try {
+    const opts = { types: [{ description: "Budget JSON", accept: { "application/json": [".json"] } }] };
+    const h = open ? (await showOpenFilePicker(opts))[0] : await showSaveFilePicker(Object.assign({ suggestedName: "budget.json" }, opts));
+    FH.handle = h; await FH.store(h); await Sync.run(true); render();
+  } catch (e) { if (e.name !== "AbortError") toast(e.message); }
+}
+function toutEffacer() {
+  if (!confirm("Effacer toutes les données de CET appareil ? (Les données sur OneDrive ne sont pas supprimées et reviendront à la prochaine synchronisation.)")) return;
+  D = emptyData(); save(false); CFG.mois = ""; saveCfg(); render();
+}
+function pickFile(accept) { return new Promise(res => { const i = document.createElement("input"); i.type = "file"; i.accept = accept; i.onchange = () => res(i.files[0] || null); i.click(); }); }
+function download(name, blob) { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); }
+function exporterJSON() { download(`budget-sauvegarde-${today()}.json`, new Blob([JSON.stringify(D, null, 1)], { type: "application/json" })); }
+async function importerJSON() {
+  const f = await pickFile(".json,application/json"); if (!f) return;
+  try { const j = JSON.parse(await f.text()); if (!j.rubriques || !j.mois) throw new Error("format"); D = mergeData(D, j); save(); render(); toast("Données fusionnées"); }
+  catch (e) { toast("Fichier JSON invalide"); }
+}
+let XLSXlib = null;
+async function loadXLSX() {
+  if (XLSXlib) return XLSXlib;
+  await new Promise((res, rej) => { const s = document.createElement("script"); s.src = "xlsx.full.min.js"; s.onload = res; s.onerror = () => rej(new Error("Bibliothèque Excel indisponible (fichier xlsx.full.min.js manquant)")); document.head.appendChild(s); });
+  return (XLSXlib = window.XLSX);
+}
+function parsePeriode(titre, key) {
+  // « BUDGET PERSONNEL DU 26 NOV AU 26 DEC 2026 »
+  const s = norm(titre).replace(/\./g, " ");
+  const r = s.match(/DU\s+(\d{1,2})\s+([A-Z]+)\s*(\d{4})?\s+AU\s+(\d{1,2})\s+([A-Z]+)\s*(\d{4})?/);
+  if (!r) return null;
+  const m1 = MOIS_ABR[r[2]] || MOIS_ABR[r[2].slice(0, 4)] || MOIS_ABR[r[2].slice(0, 3)], m2 = MOIS_ABR[r[5]] || MOIS_ABR[r[5].slice(0, 4)] || MOIS_ABR[r[5].slice(0, 3)];
+  if (!m1 || !m2) return null;
+  const y2 = Number(r[6] || r[3] || key.slice(0, 4)), y1 = Number(r[3] || (m1 > m2 ? y2 - 1 : y2));
+  return { debut: `${y1}-${pad(m1)}-${pad(r[1])}`, fin: `${y2}-${pad(m2)}-${pad(r[4])}` };
+}
+function cleSheet(name) {
+  const s = norm(name).replace(/[^A-Z0-9 ]/g, " ").trim(); const r = s.match(/([A-Z]+)\s*(\d{4})/); if (!r) return null;
+  const m = MOIS_ABR[r[1]] || MOIS_ABR[r[1].slice(0, 4)] || MOIS_ABR[r[1].slice(0, 3)]; return m ? `${r[2]}-${pad(m)}` : null;
+}
+async function importerExcel() {
+  const f = await pickFile(".xlsx,.xls,.xlsm"); if (!f) return;
+  let X; try { X = await loadXLSX(); } catch (e) { toast(e.message, 4000); return; }
+  const wb = X.read(await f.arrayBuffer(), { type: "array" });
+  const t = now(); let nbM = 0, nbR = 0; const byCode = {}; for (const r of Object.values(D.rubriques)) byCode[norm(r.code)] = r;
+  const sheets = wb.SheetNames.map(n => ({ n, k: cleSheet(n) })).filter(x => x.k).sort((a, b) => a.k.localeCompare(b.k));
+  let ordre = Math.max(0, ...Object.values(D.rubriques).map(x => x.ordre || 0));
+  for (const { n, k } of sheets) {
+    const ws = wb.Sheets[n]; if (!ws["!ref"]) continue; const rg = X.utils.decode_range(ws["!ref"]); rg.s.c = 0; rg.s.r = 0;
+    const rows = X.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null, range: rg });
+    let titre = ""; for (const row of rows.slice(0, 4)) for (const c of row || []) if (typeof c === "string" && /BUDGET|DU .* AU/i.test(c)) titre = c;
+    const per = parsePeriode(titre, k) || { debut: k + "-01", fin: addDays(addMonths(k + "-01", 1), -1) };
+    const m = D.mois[k] && !D.mois[k].del ? D.mois[k] : { key: k, revenus: [], alloc: {} };
+    Object.assign(m, per, { u: t, del: false }); m.revenus = [];
+    for (const row of rows) {
+      if (!row) continue;
+      const code = row[1], lib = row[2], val = row[3];
+      if (typeof code === "string" && /^[A-Z]{1,3}\d{1,3}$/i.test(code.trim()) && lib) {
+        const c = code.trim().toUpperCase(); let r = byCode[norm(c)];
+        const libelle = String(lib).trim().replace(/\s+\n/g, "\n");
+        if (!r) { const id = uid(); ordre += 10; r = { id, code: c, libelle, groupe: devinerGroupe(libelle), ordre, actif: true, u: t }; D.rubriques[id] = r; byCode[norm(c)] = r; nbR++; }
+        else { r.libelle = libelle; r.u = t; }
+        m.alloc[r.id] = { m: typeof val === "number" ? Math.round(val) : parseAmt(val), u: t };
+      } else if (typeof lib === "string" && /^(SALAIRE|REVENU|PRIME|AUTRE)/i.test(norm(lib).trim()) && typeof val === "number") {
+        m.revenus.push({ lib: lib.trim(), m: Math.round(val) });
+      }
+    }
+    D.mois[k] = m; nbM++;
+  }
+  if (!nbM) { toast("Aucun onglet de mois reconnu (ex. « DEC 2026 »)", 4000); return; }
+  CFG.mois = moisCourantParDefaut(); saveCfg(); save(); render(); toast(`${nbM} mois importés · ${nbR} nouvelles rubriques`, 3500);
+}
+async function exporterExcel() {
+  let X; try { X = await loadXLSX(); } catch (e) { toast(e.message, 4000); return; }
+  const wb = X.utils.book_new();
+  for (const k of moisKeys()) {
+    const m = D.mois[k], rs = moisRubs(k), dp = depenseParRub(k);
+    const aoa = [[], [null, null, `BUDGET PERSONNEL DU ${fmtDate(m.debut)} AU ${fmtDate(m.fin)}`], [], [null, "CODE", "RUBRIQUES", "ALLOUÉ", "DÉPENSÉ", "RESTE"]];
+    rs.forEach(r => aoa.push([null, r.code, r.libelle, alloue(k, r.id), dp[r.id] || 0, null]));
+    const ws = X.utils.aoa_to_sheet(aoa); const first = 5, last = 4 + rs.length;
+    for (let i = first; i <= last; i++) ws["F" + i] = { t: "n", f: `D${i}-E${i}` };
+    let row = last + 1;
+    X.utils.sheet_add_aoa(ws, [[null, null, "TOTAL"]], { origin: "A" + row });
+    ws["D" + row] = { t: "n", f: `SUM(D${first}:D${last})` }; ws["E" + row] = { t: "n", f: `SUM(E${first}:E${last})` }; ws["F" + row] = { t: "n", f: `D${row}-E${row}` };
+    const totRow = row; const revRows = [];
+    for (const r of (m.revenus || []).filter(x => !x.del)) { row++; X.utils.sheet_add_aoa(ws, [[null, null, r.lib, r.m]], { origin: "A" + row }); revRows.push(row); }
+    row++; X.utils.sheet_add_aoa(ws, [[null, null, "SOLDE (revenus − alloué)"]], { origin: "A" + row });
+    ws["D" + row] = { t: "n", f: (revRows.length ? revRows.map(x => "D" + x).join("+") : "0") + `-D${totRow}` };
+    row++; X.utils.sheet_add_aoa(ws, [[null, null, "SOLDE RÉEL (revenus − dépensé)"]], { origin: "A" + row });
+    ws["E" + row] = { t: "n", f: (revRows.length ? revRows.map(x => "D" + x).join("+") : "0") + `-E${totRow}` };
+    ws["!ref"] = "A1:F" + row; ws["!cols"] = [{ wch: 2 }, { wch: 7 }, { wch: 60 }, { wch: 13 }, { wch: 13 }, { wch: 13 }];
+    const [y, mm] = k.split("-"); X.utils.book_append_sheet(wb, ws, ["JANV","FEV","MARS","AVR","MAI","JUIN","JUIL","AOUT","SEPT","OCT","NOV","DEC"][mm - 1] + " " + y);
+  }
+  const deps = Object.values(D.depenses).filter(d => !d.del).sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  const wsd = X.utils.aoa_to_sheet([["Date", "Mois", "Code", "Rubrique", "Montant", "Note"], ...deps.map(d => { const r = D.rubriques[d.rub] || {}; return [fmtDate(d.date), moisTitre(d.mois), r.code, r.libelle, d.montant, d.note || ""]; })]);
+  wsd["!cols"] = [{ wch: 11 }, { wch: 15 }, { wch: 6 }, { wch: 50 }, { wch: 12 }, { wch: 30 }];
+  X.utils.book_append_sheet(wb, wsd, "DEPENSES");
+  X.writeFile(wb, `Budget-${today()}.xlsx`);
+}
+
+/* ---------- Boîte de dialogue ---------- */
+function openDlg(html) { const d = $("#dlg"); d.innerHTML = html; if (!d.open) d.showModal(); }
+function closeDlg() { $("#dlg").close(); }
+$("#dlg").addEventListener("click", e => { if (e.target.id === "dlg") closeDlg(); });
+
+/* ==================== Démarrage ==================== */
+$("#nav").addEventListener("click", e => { const b = e.target.closest("button"); if (b) setVue(b.dataset.v); });
+$("#moisSel").addEventListener("change", e => { CFG.mois = e.target.value; saveCfg(); render(); });
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") Sync.run(); });
+(async function init() {
+  try { await odHandleRedirect(); } catch (e) { toast("Connexion OneDrive : " + e.message, 5000); }
+  FH.handle = await FH.load();
+  render();
+  Sync.run();
+  if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
+})();
+</script>
+</body>
+</html>
